@@ -1,0 +1,16 @@
+---
+- name: Ensure docker-compose.yml is present
+  copy:
+    src: docker-compose.yml
+    dest: /opt/webapp/docker-compose.yml
+
+- name: Ensure Nginx configuration is present
+  template:
+    src: nginx.conf.j2
+    dest: /opt/webapp/nginx/nginx.conf
+
+- name: Run Docker Compose
+  command: docker-compose up -d
+  args:
+    chdir: /opt/webapp
+
