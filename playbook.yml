@@ -1,0 +1,107 @@
+---
+- name: Install Docker, Docker Compose, and Deploy Dockerized Web Application
+  hosts: webservers
+  become: yes
+  vars:
+    server_name: example.com
+
+  tasks:
+    # Установка Docker и Docker Compose
+
+    - name: Update the apt package index
+      apt:
+        update_cache: yes
+
+    - name: Install required dependencies for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Add Docker GPG key
+      command: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        filename: docker.list
+        state: present
+        update_cache: yes
+
+    - name: Install Docker and dependencies
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Install pip (for Docker Compose)
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Install Docker Compose
+      pip:
+        name: docker-compose
+
+    - name: Ensure Docker service is started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to Docker group
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+
+    - name: Verify Docker and Docker Compose installation
+      command: docker --version && docker-compose --version
+      register: docker_version_output
+
+    - name: Show Docker and Docker Compose version
+      debug:
+        var: docker_version_output.stdout
+
+    # Развертывание веб-приложения
+
+    - name: Create directory for application
+      file:
+        path: /opt/webapp
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker-compose.yml to the server
+      copy:
+        src: roles/web/files/docker-compose.yml
+        dest: /opt/webapp/docker-compose.yml
+
+    - name: Copy Dockerfile to the server
+      copy:
+        src: roles/web/files/Dockerfile
+        dest: /opt/webapp/Dockerfile
+
+    - name: Copy Nginx configuration template
+      template:
+        src: roles/web/templates/nginx.conf.j2
+        dest: /opt/webapp/nginx/nginx.conf
+
+    - name: Pull and start Docker containers using docker-compose
+      command: docker-compose up -d
+      args:
+        chdir: /opt/webapp
+
+    - name: Check running Docker containers
+      command: docker ps
+      register: docker_ps_output
+
+    - name: Show Docker running containers
+      debug:
+        var: docker_ps_output.stdout
+
